@@ -1,0 +1,55 @@
+#!/usr/bin/env node
+
+var spawn = require('child_process').spawn
+var glob = require('glob')
+var WebTorrent = require('webtorrent')
+var DHT = require('bittorrent-dht')
+
+function die (error) {
+  console.error(error)
+  process.exit(1)
+}
+
+var dht = new DHT({
+  bootstrap: ['three.printf.net:6881']
+})
+dht.listen(20000)
+
+var announcedRefs = {}
+
+// Spider all */.git dirs and announce all refs.
+var repos = glob.sync('*/.git/git-daemon-export-ok')
+repos.forEach(function (repo) {
+  console.log('in repo ' + repo)
+  repo = repo.replace(/git-daemon-export-ok$/, '')
+  console.log(repo)
+  var upload = spawn('git-upload-pack', ['--strict', repo])
+  upload.stdout.on('data', function (line) {
+    var lines = line.toString().split('\n')
+    lines.forEach(function (line) {
+      arr = line.toString().split(' ')
+      if (arr.length == 2) {
+        var sha = arr[0].toString()
+        var ref = arr[1].toString()
+        if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
+          console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
+          announcedRefs[sha] = repo
+          console.log(announcedRefs)
+          dht.announce(sha, 20000, function (err) {
+            if (err !== null)
+              console.log('Announced ' + sha)
+          })
+        }
+      }
+    })
+  })
+  upload.stdout.on('end', function () {
+    console.log('end')
+  })
+  upload.on('exit', function (code) {
+    if (code != 0)
+      die('Failed: ' + code)
+  })
+})
+
+

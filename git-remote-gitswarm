@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+
+var exec = require('child_process').exec
+var WebTorrent = require('webtorrent')
+
+// We use console.warn (stderr) because git ignores our writes to stdout.
+url = process.argv[3].replace(/^gitswarm:/i, 'git:')
+
+function die (error) {
+  console.error(error)
+  process.exit(1)
+}
+
+exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
+  if (err !== null)
+    die(err)
+  
+  lines = stdout.split('\n')
+  if (lines.length !== 2)
+    die("Didn't get back a single HEAD ref: " + lines)
+
+  var line = lines[0].split('\t')
+  var ref = line[0]
+  var head = line[1]
+  if (head !== 'HEAD')
+    die("Couldn't parse the ref line: " + ref, head)
+  if (ref.length != 40)
+    die("Was expecting a 40-byte sha: " + ref)
+    
+  console.warn("Okay, we want to get: " + ref)  
+
+  var client = new WebTorrent()
+  var magnetUri = 'magnet:?xt=urn:btih:' + ref
+
+  client.add(magnetUri, function (torrent) {
+    // Got torrent metadata!
+    console.log('Torrent info hash:', torrent.infoHash)
+
+    torrent.files.forEach(function (file) {
+      // Get a url for each file
+      console.log(file)
+    })
+  })
+})
