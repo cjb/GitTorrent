@@ -15,7 +15,7 @@ function die (error) {
 }
 
 var dht = new DHT({
-  bootstrap: ['three.printf.net:6881']
+  bootstrap: ['three.printf.net:6882']
 })
 dht.listen(20000)
 
@@ -67,7 +67,7 @@ dht.on('ready', function () {
     wire.on('handshake', function (infoHash, peerId) {
       console.log('Received handshake for ' + infoHash)
       wire.handshake(new Buffer(infoHash), new Buffer(peerId))
-      wire.use('ut_gitswarm')
+      wire.use(ut_gitswarm)
     })
   }).listen(30000)
 })

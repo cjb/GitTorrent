@@ -33,7 +33,9 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   }
   console.warn('Okay, we want to get: ' + ref)
 
-  var dht = new DHT()
+  var dht = new DHT({
+    bootstrap: ['three.printf.net:6882']
+  })
   var magnetUri = 'magnet:?xt=urn:btih:' + ref
   var parsed = magnet(magnetUri)
   dht.on('ready', function () {
@@ -47,7 +49,7 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   var swarm = new Swarm(parsed.infoHash, 'cafebabecafebabecafecafebabecafebabecafe')
   swarm.on('wire', function (wire) {
     console.error('we got a wire')
-    wire.use('ut_gitswarm')
+    wire.use(ut_gitswarm)
     // wire.ut_gitswarm.askforsha(parsed.infoHash)
   })
 })
