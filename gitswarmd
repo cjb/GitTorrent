@@ -67,7 +67,7 @@ dht.on('ready', function () {
     wire.on('handshake', function (infoHash, peerId) {
       console.log('Received handshake for ' + infoHash)
       wire.handshake(new Buffer(infoHash), new Buffer(peerId))
-      wire.use(ut_gitswarm)
+      wire.use(ut_gitswarm())
     })
   }).listen(30000)
 })

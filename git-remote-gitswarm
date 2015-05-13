@@ -49,7 +49,7 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   var swarm = new Swarm(parsed.infoHash, 'cafebabecafebabecafecafebabecafebabecafe')
   swarm.on('wire', function (wire) {
     console.error('we got a wire')
-    wire.use(ut_gitswarm)
+    wire.use(ut_gitswarm())
     // wire.ut_gitswarm.askforsha(parsed.infoHash)
   })
 })
