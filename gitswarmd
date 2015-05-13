@@ -7,7 +7,6 @@ var net = require('net')
 var Protocol = require('bittorrent-protocol')
 var spawn = require('child_process').spawn
 var Swarm = require('bittorrent-swarm')
-var WebTorrent = require('webtorrent')
 var ut_gitswarm = require('ut_gitswarm')
 
 function die (error) {
@@ -32,8 +31,8 @@ repos.forEach(function (repo) {
   upload.stdout.on('data', function (line) {
     var lines = line.toString().split('\n')
     lines.forEach(function (line) {
-      arr = line.toString().split(' ')
-      if (arr.length == 2) {
+      var arr = line.toString().split(' ')
+      if (arr.length === 2) {
         var sha = arr[0].toString()
         // First four chars are git-upload-pack's length-of-line metadata.
         sha = sha.substring(4)
@@ -43,8 +42,9 @@ repos.forEach(function (repo) {
           announcedRefs[sha] = repo
           console.log(announcedRefs)
           dht.announce(sha, 30000, function (err) {
-            if (err !== null)
+            if (err !== null) {
               console.log('Announced ' + sha)
+            }
           })
         }
       }
@@ -54,8 +54,9 @@ repos.forEach(function (repo) {
     console.log('end')
   })
   upload.on('exit', function (code) {
-    if (code != 0)
+    if (code !== 0) {
       die('Failed: ' + code)
+    }
   })
 })
 
@@ -68,5 +69,3 @@ net.createServer(function (socket) {
     wire.use('ut_gitswarm')
   })
 }).listen(30000)
-
-

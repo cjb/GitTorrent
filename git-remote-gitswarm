@@ -7,7 +7,7 @@ var Swarm = require('bittorrent-swarm')
 var ut_gitswarm = require('ut_gitswarm')
 
 // We use console.warn (stderr) because git ignores our writes to stdout.
-url = process.argv[3].replace(/^gitswarm:/i, 'git:')
+var url = process.argv[3].replace(/^gitswarm:/i, 'git:')
 
 function die (error) {
   console.error(error)
@@ -15,22 +15,23 @@ function die (error) {
 }
 
 exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
-  if (err !== null)
+  if (err !== null) {
     die(err)
-  
-  lines = stdout.split('\n')
-  if (lines.length !== 2)
+  }
+  var lines = stdout.split('\n')
+  if (lines.length !== 2) {
     die("Didn't get back a single HEAD ref: " + lines)
-
+  }
   var line = lines[0].split('\t')
   var ref = line[0]
   var head = line[1]
-  if (head !== 'HEAD')
+  if (head !== 'HEAD') {
     die("Couldn't parse the ref line: " + ref, head)
-  if (ref.length != 40)
-    die("Was expecting a 40-byte sha: " + ref)
-    
-  console.warn("Okay, we want to get: " + ref)  
+  }
+  if (ref.length !== 40) {
+    die('Was expecting a 40-byte sha: ' + ref)
+  }
+  console.warn('Okay, we want to get: ' + ref)
 
   var dht = new DHT()
   var magnetUri = 'magnet:?xt=urn:btih:' + ref
@@ -44,9 +45,9 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   })
 
   var swarm = new Swarm(parsed.infoHash, 'cafebabecafebabecafecafebabecafebabecafe')
-  swarm.on('wire', function(wire) {
+  swarm.on('wire', function (wire) {
     console.error('we got a wire')
     wire.use('ut_gitswarm')
-    //wire.ut_gitswarm.askforsha(parsed.infoHash)
+    // wire.ut_gitswarm.askforsha(parsed.infoHash)
   })
 })
