@@ -21,51 +21,53 @@ dht.listen(20000)
 
 var announcedRefs = {}
 
-// Spider all */.git dirs and announce all refs.
-var repos = glob.sync('*/.git/git-daemon-export-ok')
-repos.forEach(function (repo) {
-  console.log('in repo ' + repo)
-  repo = repo.replace(/git-daemon-export-ok$/, '')
-  console.log(repo)
-  var upload = spawn('git-upload-pack', ['--strict', repo])
-  upload.stdout.on('data', function (line) {
-    var lines = line.toString().split('\n')
-    lines.forEach(function (line) {
-      var arr = line.toString().split(' ')
-      if (arr.length === 2) {
-        var sha = arr[0].toString()
-        // First four chars are git-upload-pack's length-of-line metadata.
-        sha = sha.substring(4)
-        var ref = arr[1].toString()
-        if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
-          console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
-          announcedRefs[sha] = repo
-          console.log(announcedRefs)
-          dht.announce(sha, 30000, function (err) {
-            if (err !== null) {
-              console.log('Announced ' + sha)
-            }
-          })
+dht.on('ready', function () {
+  // Spider all */.git dirs and announce all refs.
+  var repos = glob.sync('*/.git/git-daemon-export-ok')
+  repos.forEach(function (repo) {
+    console.log('in repo ' + repo)
+    repo = repo.replace(/git-daemon-export-ok$/, '')
+    console.log(repo)
+    var upload = spawn('git-upload-pack', ['--strict', repo])
+    upload.stdout.on('data', function (line) {
+      var lines = line.toString().split('\n')
+      lines.forEach(function (line) {
+        var arr = line.toString().split(' ')
+        if (arr.length === 2) {
+          var sha = arr[0].toString()
+          // First four chars are git-upload-pack's length-of-line metadata.
+          sha = sha.substring(4)
+          var ref = arr[1].toString()
+          if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
+            console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
+            announcedRefs[sha] = repo
+            console.log(announcedRefs)
+            dht.announce(sha, 30000, function (err) {
+              if (err !== null) {
+                console.log('Announced ' + sha)
+              }
+            })
+          }
         }
+      })
+    })
+    upload.stdout.on('end', function () {
+      console.log('end')
+    })
+    upload.on('exit', function (code) {
+      if (code !== 0) {
+        die('Failed: ' + code)
       }
     })
   })
-  upload.stdout.on('end', function () {
-    console.log('end')
-  })
-  upload.on('exit', function (code) {
-    if (code !== 0) {
-      die('Failed: ' + code)
-    }
-  })
-})
 
-net.createServer(function (socket) {
-  var wire = new Protocol()
-  socket.pipe(wire).pipe(socket)
-  wire.on('handshake', function (infoHash, peerId) {
-    console.log('Received handshake for ' + infoHash)
-    wire.handshake(new Buffer(infoHash), new Buffer(peerId))
-    wire.use('ut_gitswarm')
-  })
-}).listen(30000)
+  net.createServer(function (socket) {
+    var wire = new Protocol()
+    socket.pipe(wire).pipe(socket)
+    wire.on('handshake', function (infoHash, peerId) {
+      console.log('Received handshake for ' + infoHash)
+      wire.handshake(new Buffer(infoHash), new Buffer(peerId))
+      wire.use('ut_gitswarm')
+    })
+  }).listen(30000)
+})
