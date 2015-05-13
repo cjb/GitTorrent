@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
-var spawn = require('child_process').spawn
-var glob = require('glob')
-var WebTorrent = require('webtorrent')
 var DHT = require('bittorrent-dht')
+var glob = require('glob')
+var magnet = require('magnet-uri')
+var net = require('net')
+var Protocol = require('bittorrent-protocol')
+var spawn = require('child_process').spawn
+var Swarm = require('bittorrent-swarm')
+var WebTorrent = require('webtorrent')
+var ut_gitswarm = require('ut_gitswarm')
 
 function die (error) {
   console.error(error)
@@ -30,12 +35,14 @@ repos.forEach(function (repo) {
       arr = line.toString().split(' ')
       if (arr.length == 2) {
         var sha = arr[0].toString()
+        // First four chars are git-upload-pack's length-of-line metadata.
+        sha = sha.substring(4)
         var ref = arr[1].toString()
         if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
           console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
           announcedRefs[sha] = repo
           console.log(announcedRefs)
-          dht.announce(sha, 20000, function (err) {
+          dht.announce(sha, 30000, function (err) {
             if (err !== null)
               console.log('Announced ' + sha)
           })
@@ -51,5 +58,15 @@ repos.forEach(function (repo) {
       die('Failed: ' + code)
   })
 })
+
+net.createServer(function (socket) {
+  var wire = new Protocol()
+  socket.pipe(wire).pipe(socket)
+  wire.on('handshake', function (infoHash, peerId) {
+    console.log('Received handshake for ' + infoHash)
+    wire.handshake(new Buffer(infoHash), new Buffer(peerId))
+    wire.use('ut_gitswarm')
+  })
+}).listen(30000)
 
 

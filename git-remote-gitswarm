@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
+var DHT = require('bittorrent-dht')
 var exec = require('child_process').exec
-var WebTorrent = require('webtorrent')
+var magnet = require('magnet-uri')
+var Swarm = require('bittorrent-swarm')
+var ut_gitswarm = require('ut_gitswarm')
 
 // We use console.warn (stderr) because git ignores our writes to stdout.
 url = process.argv[3].replace(/^gitswarm:/i, 'git:')
@@ -29,16 +32,21 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
     
   console.warn("Okay, we want to get: " + ref)  
 
-  var client = new WebTorrent()
+  var dht = new DHT()
   var magnetUri = 'magnet:?xt=urn:btih:' + ref
+  var parsed = magnet(magnetUri)
+  dht.on('ready', function () {
+    dht.lookup(parsed.infoHash)
+  })
+  dht.on('peer', function (addr, hash, from) {
+    console.error(addr, hash, from)
+    swarm.addPeer(addr)
+  })
 
-  client.add(magnetUri, function (torrent) {
-    // Got torrent metadata!
-    console.log('Torrent info hash:', torrent.infoHash)
-
-    torrent.files.forEach(function (file) {
-      // Get a url for each file
-      console.log(file)
-    })
+  var swarm = new Swarm(parsed.infoHash, 'cafebabecafebabecafecafebabecafebabecafe')
+  swarm.on('wire', function(wire) {
+    console.error('we got a wire')
+    wire.use('ut_gitswarm')
+    //wire.ut_gitswarm.askforsha(parsed.infoHash)
   })
 })
