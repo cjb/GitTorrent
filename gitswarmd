@@ -2,11 +2,10 @@
 
 var DHT = require('bittorrent-dht')
 var glob = require('glob')
-var magnet = require('magnet-uri')
+var fs = require('fs')
 var net = require('net')
 var Protocol = require('bittorrent-protocol')
 var spawn = require('child_process').spawn
-var Swarm = require('bittorrent-swarm')
 var ut_gitswarm = require('ut_gitswarm')
 
 function die (error) {
@@ -15,9 +14,9 @@ function die (error) {
 }
 
 var dht = new DHT({
-  bootstrap: ['three.printf.net:6882']
+  bootstrap: ['three.printf.net:6881']
 })
-dht.listen(20000)
+dht.listen(6882)
 
 var announcedRefs = {}
 
@@ -63,11 +62,36 @@ dht.on('ready', function () {
 
   net.createServer(function (socket) {
     var wire = new Protocol()
+    wire.use(ut_gitswarm())
     socket.pipe(wire).pipe(socket)
     wire.on('handshake', function (infoHash, peerId) {
       console.log('Received handshake for ' + infoHash)
       wire.handshake(new Buffer(infoHash), new Buffer(peerId))
-      wire.use(ut_gitswarm())
+    })
+    wire.ut_gitswarm.on('generatePack', function (sha) {
+      console.error('calling git pack-objects')
+      var filename = fs.createWriteStream(sha + '.pack')
+      if (!announcedRefs[sha]) {
+        console.error('Asked for an unknown sha!')
+      }
+      var directory = announcedRefs[sha]
+      var pack = spawn('git', ['pack-objects', '--revs', '--thin', '--stdout', '--delta-base-offset'], {cwd: directory})
+      pack.on('close', function (code) {
+        if (code !== 0) {
+          console.error('git pack-objects process exited with code ' + code)
+        } else {
+          console.error('Finished writing ' + filename)
+        }
+      })
+      pack.stdout.pipe(filename)
+      pack.stderr.on('data', function (data) {
+        console.error(data.toString())
+      })
+      pack.on('exit', function () {
+        console.log('exited')
+      })
+      pack.stdin.write(sha + '\n')
+      pack.stdin.write('--not\n\n')
     })
   }).listen(30000)
 })

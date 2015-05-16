@@ -50,6 +50,9 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   swarm.on('wire', function (wire) {
     console.error('we got a wire')
     wire.use(ut_gitswarm())
-    // wire.ut_gitswarm.askforsha(parsed.infoHash)
+    wire.ut_gitswarm.on('handshake', function () {
+      console.error('in ut_gitswarm on handshake')
+      wire.ut_gitswarm.ask(parsed.infoHash)
+    })
   })
 })
