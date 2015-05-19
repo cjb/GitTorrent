@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+var createTorrent = require('create-torrent')
 var DHT = require('bittorrent-dht')
 var glob = require('glob')
 var fs = require('fs')
@@ -7,6 +8,8 @@ var net = require('net')
 var Protocol = require('bittorrent-protocol')
 var spawn = require('child_process').spawn
 var ut_gitswarm = require('ut_gitswarm')
+var ut_metadata = require('ut_metadata')
+var WebTorrent = require('webtorrent')
 
 function die (error) {
   console.error(error)
@@ -63,6 +66,7 @@ dht.on('ready', function () {
   net.createServer(function (socket) {
     var wire = new Protocol()
     wire.use(ut_gitswarm())
+    wire.use(ut_metadata())
     socket.pipe(wire).pipe(socket)
     wire.on('handshake', function (infoHash, peerId) {
       console.log('Received handshake for ' + infoHash)
@@ -70,7 +74,8 @@ dht.on('ready', function () {
     })
     wire.ut_gitswarm.on('generatePack', function (sha) {
       console.error('calling git pack-objects')
-      var filename = fs.createWriteStream(sha + '.pack')
+      var filename = sha + '.pack'
+      var stream = fs.createWriteStream(filename)
       if (!announcedRefs[sha]) {
         console.error('Asked for an unknown sha!')
       }
@@ -81,9 +86,17 @@ dht.on('ready', function () {
           console.error('git pack-objects process exited with code ' + code)
         } else {
           console.error('Finished writing ' + filename)
+          var webtorrent = new WebTorrent({
+            dht: {bootstrap: ['three.printf.net:6882']},
+            tracker: false
+          })
+          webtorrent.seed(filename, function onTorrent (torrent) {
+            console.error(torrent.infoHash)
+            wire.ut_gitswarm.sendTorrent(torrent.infoHash)
+          })
         }
       })
-      pack.stdout.pipe(filename)
+      pack.stdout.pipe(stream)
       pack.stderr.on('data', function (data) {
         console.error(data.toString())
       })

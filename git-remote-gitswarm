@@ -2,9 +2,12 @@
 
 var DHT = require('bittorrent-dht')
 var exec = require('child_process').exec
+var fs = require('fs')
 var magnet = require('magnet-uri')
+var spawn = require('child_process').spawn
 var Swarm = require('bittorrent-swarm')
 var ut_gitswarm = require('ut_gitswarm')
+var WebTorrent = require('webtorrent')
 
 // We use console.warn (stderr) because git ignores our writes to stdout.
 var url = process.argv[3].replace(/^gitswarm:/i, 'git:')
@@ -15,6 +18,7 @@ function die (error) {
 }
 
 exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
+  var targetdir = process.env['GIT_DIR']
   if (err !== null) {
     die(err)
   }
@@ -33,6 +37,20 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   }
   console.warn('Okay, we want to get: ' + ref)
 
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('readable', function() {
+    var chunk = process.stdin.read();
+    if (chunk === 'capabilities\n') {
+      process.stdout.write('fetch\n\n')
+    }
+    if (chunk === 'list\n') {
+      process.stdout.write(ref + ' refs/heads/master\n\n')
+    }
+  })
+  process.stdout.on('error', function () {
+    // stdout was closed
+  })
+
   var dht = new DHT({
     bootstrap: ['three.printf.net:6882']
   })
@@ -42,17 +60,42 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
     dht.lookup(parsed.infoHash)
   })
   dht.on('peer', function (addr, hash, from) {
-    console.error(addr, hash, from)
     swarm.addPeer(addr)
   })
 
   var swarm = new Swarm(parsed.infoHash, 'cafebabecafebabecafecafebabecafebabecafe')
   swarm.on('wire', function (wire) {
-    console.error('we got a wire')
     wire.use(ut_gitswarm())
     wire.ut_gitswarm.on('handshake', function () {
-      console.error('in ut_gitswarm on handshake')
       wire.ut_gitswarm.ask(parsed.infoHash)
+    })
+    wire.ut_gitswarm.on('receivedTorrent', function (infoHash) {
+      var client = new WebTorrent({
+        dht: {
+          bootstrap: ['three.printf.net:6882']
+        },
+        tracker: false
+      })
+      client.download(infoHash, function (torrent) {
+        torrent.on('done', function (done) {
+          var filename = torrent.storage.path + '/' + torrent.files[0].path
+          var unpack = spawn('git', ['index-pack', '--stdin', '-v', '--fix-thin'])
+          var stream = fs.createReadStream(filename)
+          stream.on('open', function () {
+            stream.pipe(unpack.stdin)
+          })
+          unpack.on('exit', function (code) {
+            var stream = fs.createWriteStream(targetdir + '/refs/heads/master')
+            stream.once('open', function (fd) {
+              stream.write(ref + '\n')
+              stream.end()
+              // These writes are actually necessary for git to finish checkout.
+              process.stdout.write('\n\n')
+              process.exit()
+            })
+          })
+        })
+      })
     })
   })
 })
