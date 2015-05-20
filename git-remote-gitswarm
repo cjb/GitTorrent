@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+var Chalk = require('chalk')
 var DHT = require('bittorrent-dht')
 var exec = require('child_process').exec
 var fs = require('fs')
@@ -11,6 +12,9 @@ var WebTorrent = require('webtorrent')
 
 // We use console.warn (stderr) because git ignores our writes to stdout.
 var url = process.argv[3].replace(/^gitswarm:/i, 'git:')
+
+// Gotta enable color manually because stdout isn't a tty.
+var chalk = new Chalk.constructor({enabled: true});
 
 function die (error) {
   console.error(error)
@@ -35,11 +39,12 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   if (ref.length !== 40) {
     die('Was expecting a 40-byte sha: ' + ref)
   }
-  console.warn('Okay, we want to get: ' + ref)
 
-  process.stdin.setEncoding('utf8');
+  console.warn('\nOkay, we want to get: ' + chalk.green(ref) + '\n')
+
+  process.stdin.setEncoding('utf8')
   process.stdin.on('readable', function() {
-    var chunk = process.stdin.read();
+    var chunk = process.stdin.read()
     if (chunk === 'capabilities\n') {
       process.stdout.write('fetch\n\n')
     }
@@ -65,6 +70,7 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
 
   var swarm = new Swarm(parsed.infoHash, 'cafebabecafebabecafecafebabecafebabecafe')
   swarm.on('wire', function (wire) {
+    console.warn('Adding swarm peer: ' + chalk.green(wire.remoteAddress) + '\n')
     wire.use(ut_gitswarm())
     wire.ut_gitswarm.on('handshake', function () {
       wire.ut_gitswarm.ask(parsed.infoHash)
@@ -77,6 +83,7 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
         tracker: false
       })
       client.download(infoHash, function (torrent) {
+        console.warn('Downloading git pack with infohash: ' + chalk.green(infoHash) + '\n')
         torrent.on('done', function (done) {
           var filename = torrent.storage.path + '/' + torrent.files[0].path
           var unpack = spawn('git', ['index-pack', '--stdin', '-v', '--fix-thin'])
@@ -84,6 +91,7 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
           stream.on('open', function () {
             stream.pipe(unpack.stdin)
           })
+          unpack.stderr.pipe(process.stderr)
           unpack.on('exit', function (code) {
             var stream = fs.createWriteStream(targetdir + '/refs/heads/master')
             stream.once('open', function (fd) {
