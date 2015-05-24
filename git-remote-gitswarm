@@ -69,8 +69,8 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
   })
 
   var swarm = new Swarm(parsed.infoHash, 'cafebabecafebabecafecafebabecafebabecafe')
-  swarm.on('wire', function (wire) {
-    console.warn('Adding swarm peer: ' + chalk.green(wire.remoteAddress) + '\n')
+  swarm.on('wire', function (wire, addr) {
+    console.warn('Adding swarm peer: ' + chalk.green(addr) + '\n')
     wire.use(ut_gitswarm())
     wire.ut_gitswarm.on('handshake', function () {
       wire.ut_gitswarm.ask(parsed.infoHash)
