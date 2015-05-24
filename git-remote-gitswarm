@@ -10,36 +10,62 @@ var Swarm = require('bittorrent-swarm')
 var ut_gitswarm = require('ut_gitswarm')
 var WebTorrent = require('webtorrent')
 
-// We use console.warn (stderr) because git ignores our writes to stdout.
-var url = process.argv[3].replace(/^gitswarm:/i, 'git:')
-
-// Gotta enable color manually because stdout isn't a tty.
-var chalk = new Chalk.constructor({enabled: true});
-
 function die (error) {
   console.error(error)
   process.exit(1)
 }
 
-exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
-  var targetdir = process.env['GIT_DIR']
-  if (err !== null) {
-    die(err)
-  }
-  var lines = stdout.split('\n')
-  if (lines.length !== 2) {
-    die("Didn't get back a single HEAD ref: " + lines)
-  }
-  var line = lines[0].split('\t')
-  var ref = line[0]
-  var head = line[1]
-  if (head !== 'HEAD') {
-    die("Couldn't parse the ref line: " + ref, head)
-  }
-  if (ref.length !== 40) {
-    die('Was expecting a 40-byte sha: ' + ref)
-  }
+// Gotta enable color manually because stdout isn't a tty.
+var chalk = new Chalk.constructor({enabled: true});
 
+var dht = new DHT({
+  bootstrap: ['three.printf.net:6882']
+})
+
+var url = process.argv[3]
+var matches = url.match(/gitswarm:\/\/([a-f0-9]{40})\/(.*)/)
+if (matches) {
+  var key = matches[1]
+  var reponame = matches[2]
+  dht.on('ready', function () {
+    var val = new Buffer(key, 'hex')
+    dht.get(val, function(err, res) {
+      if (err) {
+        return console.error(err)
+      }
+      var json = res.v.toString()
+      var repos = JSON.parse(json)
+      console.warn('\nMutable key ' + chalk.green(key) + ' returned:\n' + chalk.yellow(json))
+      get_infohash(repos[reponame])
+    })
+  })
+} else {
+  url = url.replace(/^gitswarm:/i, 'git:')
+  exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
+    if (err !== null) {
+      die(err)
+    }
+    var lines = stdout.split('\n')
+    if (lines.length !== 2) {
+      die("Didn't get back a single HEAD ref: " + lines)
+    }
+    var line = lines[0].split('\t')
+    var ref = line[0]
+    var head = line[1]
+    if (head !== 'HEAD') {
+      die("Couldn't parse the ref line: " + ref, head)
+    }
+    if (ref.length !== 40) {
+      die('Was expecting a 40-byte sha: ' + ref)
+    }
+    dht.on('ready', function () {
+      get_infohash(ref)
+    })
+  })
+}
+
+function get_infohash (ref) {
+  // We use console.warn (stderr) because git ignores our writes to stdout.
   console.warn('\nOkay, we want to get: ' + chalk.green(ref) + '\n')
 
   process.stdin.setEncoding('utf8')
@@ -56,14 +82,10 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
     // stdout was closed
   })
 
-  var dht = new DHT({
-    bootstrap: ['three.printf.net:6882']
-  })
   var magnetUri = 'magnet:?xt=urn:btih:' + ref
   var parsed = magnet(magnetUri)
-  dht.on('ready', function () {
-    dht.lookup(parsed.infoHash)
-  })
+  dht.lookup(parsed.infoHash)
+
   dht.on('peer', function (addr, hash, from) {
     swarm.addPeer(addr)
   })
@@ -93,6 +115,7 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
           })
           unpack.stderr.pipe(process.stderr)
           unpack.on('exit', function (code) {
+            var targetdir = process.env['GIT_DIR']
             var stream = fs.createWriteStream(targetdir + '/refs/heads/master')
             stream.once('open', function (fd) {
               stream.write(ref + '\n')
@@ -106,4 +129,4 @@ exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
       })
     })
   })
-})
+}
