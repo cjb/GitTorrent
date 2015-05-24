@@ -2,6 +2,8 @@
 
 var createTorrent = require('create-torrent')
 var DHT = require('bittorrent-dht')
+var EC = require('elliptic').ec
+var ed25519 = new EC('ed25519')
 var glob = require('glob')
 var fs = require('fs')
 var net = require('net')
@@ -22,10 +24,32 @@ var dht = new DHT({
 dht.listen(6882)
 
 var announcedRefs = {}
+var announcedRepos = {}
+var keyfile = fs.readFileSync('ed25519.key').toString().split('\n')
+var pub = keyfile[0]
+var priv = keyfile[1]
+var keypair = ed25519.keyPair({
+  priv: priv,
+  privEnc: 'hex',
+  pub: pub,
+  pubEnc: 'hex',
+})
 
+function bpad (n, buf) {
+  if (buf.length === n) return buf
+  if (buf.length < n) {
+    var b = new Buffer(n)
+    buf.copy(b, n - buf.length)
+    for (var i = 0; i < n - buf.length; i++) b[i] = 0
+    return b
+  }
+}
+
+console.log(keypair)
 dht.on('ready', function () {
   // Spider all */.git dirs and announce all refs.
   var repos = glob.sync('*/.git/git-daemon-export-ok')
+  var count = repos.length
   repos.forEach(function (repo) {
     console.log('in repo ' + repo)
     repo = repo.replace(/git-daemon-export-ok$/, '')
@@ -43,7 +67,13 @@ dht.on('ready', function () {
           if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
             console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
             announcedRefs[sha] = repo
+            announcedRepos[repo.replace(/\/.git\/$/, '')] = sha
             console.log(announcedRefs)
+            // Callback counting for repos
+            count--
+            if (count <= 0) {
+              publish_mutable_key()
+            }
             dht.announce(sha, 30000, function (err) {
               if (err !== null) {
                 console.log('Announced ' + sha)
@@ -62,6 +92,27 @@ dht.on('ready', function () {
       }
     })
   })
+
+  function publish_mutable_key () {
+    var json = JSON.stringify(announcedRepos)
+    var len = json.length
+    var value = new Buffer(90)
+    value.write(json)
+    value.fill(' ', json.length)
+    var sig = keypair.sign(value)
+    var opts = {
+      k: bpad(32, Buffer(keypair.getPublic().x.toArray())),
+      seq: 0,
+      v: value,
+      sig: Buffer.concat([
+        bpad(32, Buffer(sig.r.toArray())),
+        bpad(32, Buffer(sig.s.toArray()))
+    ])}
+    dht.put(opts, function (errors, hash) {
+      console.error('errors=', errors)
+      console.log('hash=', hash.toString('hex'))
+    })
+  }
 
   net.createServer(function (socket) {
     var wire = new Protocol()
