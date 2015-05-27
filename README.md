@@ -1,7 +1,8 @@
-GitSwarm
-========
+# ![GitSwarm](http://gitswarm.org)
 
-GitSwarm is a project to explore what a decentralized GitHub would look like -- a global file store that's powered by cooperation and sharing rather than a big datacenter with disks and bandwidth.
+### The Decentralization of GitHub
+
+**GitSwarm** is a peer-to-peer network of Git repositories being shared over BitTorrent.
 
 To get started:
 ```
@@ -82,3 +83,22 @@ e.g.
 ```
 
 Note that OP_RETURN transactions are limited to 80 bytes, which limits usernames in this scheme to 29 bytes.
+
+## Contributing
+
+Please send pull requests!  Even changes to the design of GitSwarm are welcome and encouraged; nothing is set in stone.
+
+#### JavaScript Standard Style
+
+GitSwarm uses [JavaScript Standard Style](https://github.com/feross/standard).
+
+[![js-standard-style](https://raw.githubusercontent.com/feross/standard/master/badge.png)](https://github.com/feross/standard)
+
+#### Enable debug logs
+
+In **node**, enable debug logs by setting the `DEBUG` environment variable to the name of the
+module you want to debug (e.g. `bittorrent-protocol`, or `*` to print **all logs**).
+
+### License
+
+MIT. Copyright (c) [Chris Ball](http://printf.net).
