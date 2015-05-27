@@ -3,6 +3,7 @@
 var DHT = require('bittorrent-dht')
 var EC = require('elliptic').ec
 var ed25519 = new EC('ed25519')
+var exec = require('child_process').exec
 var glob = require('glob')
 var fs = require('fs')
 var net = require('net')
@@ -23,18 +24,35 @@ var dht = new DHT({
 dht.listen(6882)
 
 var announcedRefs = {}
-var announcedRepos = {}
+var userProfile = {
+  name: '',
+  email: '',
+  repositories: {}
+}
+
+// These would be better as execSync, but node didn't get that until 0.12.
+exec('git config user.name', function (error, stdout, stderr) {
+  userProfile.name = stdout.trim()
+  if (error !== null) {
+    die("Couldn't get git user name: " + error)
+  }
+})
+exec('git config user.email', function (error, stdout, stderr) {
+  userProfile.email = stdout.trim()
+  if (error !== null) {
+    die("Couldn't get git user email: " + error)
+  }
+})
 var key = create_or_read_keyfile()
 
 function create_or_read_keyfile () {
   var filename = 'ed25519.key'
   if (!fs.existsSync(filename)) {
     var keypair = new EC('ed25519').genKeyPair()
-    var key = {
+    fs.writeFileSync(filename, JSON.stringify({
       pub: keypair.getPublic('hex'),
       priv: keypair.getPrivate('hex')
-    }
-    fs.writeFileSync(filename, JSON.stringify(key))
+    }))
   }
 
   // Okay, now the file exists, whether created here or not.
@@ -77,9 +95,11 @@ dht.on('ready', function () {
           var ref = arr[1].toString()
           if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
             console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
-            announcedRefs[sha] = repo
-            announcedRepos[repo.replace(/\/.git\/$/, '')] = sha
-            console.log(announcedRefs)
+            announcedRefs.master = {}
+            announcedRefs.master[sha] = repo
+            var reponame = repo.replace(/\/.git\/$/, '')
+            userProfile.repositories[reponame] = {}
+            userProfile.repositories[reponame].master = sha
             // Callback counting for repos
             count--
             if (count <= 0) {
@@ -105,7 +125,7 @@ dht.on('ready', function () {
   })
 
   function publish_mutable_key () {
-    var json = JSON.stringify(announcedRepos)
+    var json = JSON.stringify(userProfile)
     if (json.length > 950) {
       console.error("Can't publish mutable key: doesn't fit in 950 bytes.")
       return false
@@ -121,6 +141,7 @@ dht.on('ready', function () {
         bpad(32, Buffer(sig.r.toArray())),
         bpad(32, Buffer(sig.s.toArray()))
     ])}
+    console.log(json)
     dht.put(opts, function (errors, hash) {
       console.error('errors=', errors)
       console.log('hash=', hash.toString('hex'))
