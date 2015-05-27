@@ -23,7 +23,9 @@ var dht = new DHT({
 })
 dht.listen(6882)
 
-var announcedRefs = {}
+var announcedRefs = {
+  master: {}
+}
 var userProfile = {
   name: '',
   email: '',
@@ -94,22 +96,23 @@ dht.on('ready', function () {
           sha = sha.substring(4)
           var ref = arr[1].toString()
           if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
-            console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
-            announcedRefs.master = {}
-            announcedRefs.master[sha] = repo
-            var reponame = repo.replace(/\/.git\/$/, '')
-            userProfile.repositories[reponame] = {}
-            userProfile.repositories[reponame].master = sha
-            // Callback counting for repos
-            count--
-            if (count <= 0) {
-              publish_mutable_key()
-            }
-            dht.announce(sha, 30000, function (err) {
-              if (err !== null) {
-                console.log('Announced ' + sha)
+            if (!announcedRefs.master[sha]) {
+              console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
+              announcedRefs.master[sha] = repo
+              var reponame = repo.replace(/\/.git\/$/, '')
+              userProfile.repositories[reponame] = {}
+              userProfile.repositories[reponame].master = sha
+              // Callback counting for repos
+              count--
+              if (count <= 0) {
+                publish_mutable_key()
               }
-            })
+              dht.announce(sha, 30000, function (err) {
+                if (err !== null) {
+                  console.log('Announced ' + sha)
+                }
+              })
+            }
           }
         }
       })
@@ -161,10 +164,10 @@ dht.on('ready', function () {
       console.error('calling git pack-objects')
       var filename = sha + '.pack'
       var stream = fs.createWriteStream(filename)
-      if (!announcedRefs[sha]) {
+      if (!announcedRefs.master[sha]) {
         console.error('Asked for an unknown sha!')
       }
-      var directory = announcedRefs[sha]
+      var directory = announcedRefs.master[sha]
       var pack = spawn('git', ['pack-objects', '--revs', '--thin', '--stdout', '--delta-base-offset'], {cwd: directory})
       pack.on('close', function (code) {
         if (code !== 0) {
