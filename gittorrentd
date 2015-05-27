@@ -9,7 +9,7 @@ var fs = require('fs')
 var net = require('net')
 var Protocol = require('bittorrent-protocol')
 var spawn = require('child_process').spawn
-var ut_gitswarm = require('ut_gitswarm')
+var ut_gittorrent = require('ut_gittorrent')
 var ut_metadata = require('ut_metadata')
 var WebTorrent = require('webtorrent')
 
@@ -153,14 +153,14 @@ dht.on('ready', function () {
 
   net.createServer(function (socket) {
     var wire = new Protocol()
-    wire.use(ut_gitswarm())
+    wire.use(ut_gittorrent())
     wire.use(ut_metadata())
     socket.pipe(wire).pipe(socket)
     wire.on('handshake', function (infoHash, peerId) {
       console.log('Received handshake for ' + infoHash)
       wire.handshake(new Buffer(infoHash), new Buffer(peerId))
     })
-    wire.ut_gitswarm.on('generatePack', function (sha) {
+    wire.ut_gittorrent.on('generatePack', function (sha) {
       console.error('calling git pack-objects')
       var filename = sha + '.pack'
       var stream = fs.createWriteStream(filename)
@@ -180,7 +180,7 @@ dht.on('ready', function () {
           })
           webtorrent.seed(filename, function onTorrent (torrent) {
             console.error(torrent.infoHash)
-            wire.ut_gitswarm.sendTorrent(torrent.infoHash)
+            wire.ut_gittorrent.sendTorrent(torrent.infoHash)
           })
         }
       })
