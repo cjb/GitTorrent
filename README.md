@@ -84,6 +84,10 @@ e.g.
 
 Note that OP_RETURN transactions are limited to 80 bytes, which limits usernames in this scheme to 29 bytes.
 
+As a convenience, this repository will include a database of registered usernames that is updated regularly.  This doesn't make GitSwarm any more centralized -- you can run the same scripts yourself on a downloaded blockchain to make sure that this repository does not lie.  This is just to save everyone from downloading tens of gigabytes of blockchain to process.
+
+By the way, storing full Bitcoin history is not necessary.  We just need to scan every transaction once, and can discard each transaction after we've scanned it once and determined whether it contained a valid username registration that we record.  We just need to scan through all unprocessed blockchain transactions once, and record where we got up to so that we don't have to look at them again after that.
+
 ## Contributing
 
 Please send pull requests!  Even changes to the design of GitSwarm are welcome and encouraged; nothing is set in stone.
