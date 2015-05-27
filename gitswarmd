@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-var createTorrent = require('create-torrent')
 var DHT = require('bittorrent-dht')
 var EC = require('elliptic').ec
 var ed25519 = new EC('ed25519')
@@ -25,15 +24,18 @@ dht.listen(6882)
 
 var announcedRefs = {}
 var announcedRepos = {}
-var keyfile = fs.readFileSync('ed25519.key').toString().split('\n')
-var pub = keyfile[0]
-var priv = keyfile[1]
-var keypair = ed25519.keyPair({
-  priv: priv,
-  privEnc: 'hex',
-  pub: pub,
-  pubEnc: 'hex',
-})
+var key = read_keyfile()
+console.log(key)
+
+function read_keyfile () {
+  var key = JSON.parse(fs.readFileSync('ed25519.key').toString())
+  return ed25519.keyPair({
+    priv: key.priv,
+    privEnc: 'hex',
+    pub: key.pub,
+    pubEnc: 'hex'
+  })
+}
 
 function bpad (n, buf) {
   if (buf.length === n) return buf
@@ -45,7 +47,7 @@ function bpad (n, buf) {
   }
 }
 
-console.log(keypair)
+console.log(key)
 dht.on('ready', function () {
   // Spider all */.git dirs and announce all refs.
   var repos = glob.sync('*/.git/git-daemon-export-ok')
@@ -95,13 +97,15 @@ dht.on('ready', function () {
 
   function publish_mutable_key () {
     var json = JSON.stringify(announcedRepos)
-    var len = json.length
-    var value = new Buffer(90)
+    if (json.length > 950) {
+      console.error("Can't publish mutable key: doesn't fit in 950 bytes.")
+      return false
+    }
+    var value = new Buffer(json.length)
     value.write(json)
-    value.fill(' ', json.length)
-    var sig = keypair.sign(value)
+    var sig = key.sign(value)
     var opts = {
-      k: bpad(32, Buffer(keypair.getPublic().x.toArray())),
+      k: bpad(32, Buffer(key.getPublic().x.toArray())),
       seq: 0,
       v: value,
       sig: Buffer.concat([

@@ -29,7 +29,7 @@ if (matches) {
   var reponame = matches[2]
   dht.on('ready', function () {
     var val = new Buffer(key, 'hex')
-    dht.get(val, function(err, res) {
+    dht.get(val, function (err, res) {
       if (err) {
         return console.error(err)
       }
@@ -69,7 +69,7 @@ function get_infohash (ref) {
   console.warn('\nOkay, we want to get: ' + chalk.green(ref) + '\n')
 
   process.stdin.setEncoding('utf8')
-  process.stdin.on('readable', function() {
+  process.stdin.on('readable', function () {
     var chunk = process.stdin.read()
     if (chunk === 'capabilities\n') {
       process.stdout.write('fetch\n\n')
