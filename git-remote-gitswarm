@@ -36,7 +36,7 @@ if (matches) {
       var json = res.v.toString()
       var repos = JSON.parse(json)
       console.warn('\nMutable key ' + chalk.green(key) + ' returned:\n' + chalk.yellow(json))
-      get_infohash(repos[reponame])
+      get_infohash(repos.repositories[reponame].master)
     })
   })
 } else {
