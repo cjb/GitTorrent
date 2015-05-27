@@ -1,0 +1,50 @@
+{
+  "name": "gitswarm",
+  "description": "Using BitTorrent to share git repositories",
+  "version": "0.1.0",
+  "author": {
+    "name": "Chris Ball",
+    "email": "chris@printf.net",
+    "url": "http://printf.net/"
+  },
+  "bin": {
+    "git-remote-gitswarm": "./git-remote-gitswarm",
+    "gitswarmd": "./gitswarmd"
+  },
+  "bugs": {
+    "url": "https://github.com/cjb/gitswarm/issues"
+  },
+  "dependencies": {
+    "bencode": "^0.7.0",
+    "bittorrent-protocol": "^1.5.7",
+    "bittorrent-swarm": "^2.0.0",
+    "chalk": "^1.0.0",
+    "concat-map": "^0.0.1",
+    "create-torrent": "^3.11.1",
+    "glob": "^5.0.6",
+    "inherits": "^2.0.1",
+    "magnet-uri": "^4.0.0",
+    "ut_gitswarm": "^0.1.0",
+    "ut_metadata": "^2.7.3",
+    "webtorrent": "^0.32.0"
+  },
+  "devDependencies": {
+    "bittorrent-dht": "^3.0.0",
+    "standard": "^3.1.1"
+  },
+  "homepage": "http://webtorrent.io",
+  "keywords": [
+    "torrent",
+    "bittorrent",
+    "bittorrent client",
+    "git",
+    "gitswarm",
+    "mad science"
+  ],
+  "license": "MIT",
+  "main": "git-remote-gitswarm",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/cjb/gitswarm.git"
+  }
+}
