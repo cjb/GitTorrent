@@ -24,10 +24,20 @@ dht.listen(6882)
 
 var announcedRefs = {}
 var announcedRepos = {}
-var key = read_keyfile()
-console.log(key)
+var key = create_or_read_keyfile()
 
-function read_keyfile () {
+function create_or_read_keyfile () {
+  var filename = 'ed25519.key'
+  if (!fs.existsSync(filename)) {
+    var keypair = new EC('ed25519').genKeyPair()
+    var key = {
+      pub: keypair.getPublic('hex'),
+      priv: keypair.getPrivate('hex')
+    }
+    fs.writeFileSync(filename, JSON.stringify(key))
+  }
+
+  // Okay, now the file exists, whether created here or not.
   var key = JSON.parse(fs.readFileSync('ed25519.key').toString())
   return ed25519.keyPair({
     priv: key.priv,
@@ -47,7 +57,6 @@ function bpad (n, buf) {
   }
 }
 
-console.log(key)
 dht.on('ready', function () {
   // Spider all */.git dirs and announce all refs.
   var repos = glob.sync('*/.git/git-daemon-export-ok')
