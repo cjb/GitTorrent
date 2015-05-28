@@ -18,8 +18,10 @@ function die (error) {
   process.exit(1)
 }
 
+var bootstrap = ['dht.gittorrent.org:6881', 'core.gittorrent.org:6881']
+
 var dht = new DHT({
-  bootstrap: ['three.printf.net:6881']
+  bootstrap: bootstrap
 })
 dht.listen(6882)
 
@@ -175,7 +177,7 @@ dht.on('ready', function () {
         } else {
           console.error('Finished writing ' + filename)
           var webtorrent = new WebTorrent({
-            dht: {bootstrap: ['three.printf.net:6882']},
+            dht: {bootstrap: bootstrap},
             tracker: false
           })
           webtorrent.seed(filename, function onTorrent (torrent) {

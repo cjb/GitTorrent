@@ -19,8 +19,9 @@ function die (error) {
 // Gotta enable color manually because stdout isn't a tty.
 var chalk = new Chalk.constructor({enabled: true});
 
+var bootstrap = ['dht.gittorrent.org:6881', 'core.gittorrent.org:6881']
 var dht = new DHT({
-  bootstrap: ['three.printf.net:6882']
+  bootstrap: bootstrap
 })
 
 var url = process.argv[3]
@@ -101,7 +102,7 @@ function get_infohash (ref) {
     wire.ut_gittorrent.on('receivedTorrent', function (infoHash) {
       var client = new WebTorrent({
         dht: {
-          bootstrap: ['three.printf.net:6882']
+          bootstrap: bootstrap
         },
         tracker: false
       })
