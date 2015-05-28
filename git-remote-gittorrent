@@ -5,6 +5,7 @@ var DHT = require('bittorrent-dht')
 var exec = require('child_process').exec
 var fs = require('fs')
 var magnet = require('magnet-uri')
+var prettyjson = require('prettyjson')
 var spawn = require('child_process').spawn
 var Swarm = require('bittorrent-swarm')
 var ut_gittorrent = require('ut_gittorrent')
@@ -35,7 +36,7 @@ if (matches) {
       }
       var json = res.v.toString()
       var repos = JSON.parse(json)
-      console.warn('\nMutable key ' + chalk.green(key) + ' returned:\n' + chalk.yellow(json))
+      console.warn('\nMutable key ' + chalk.green(key) + ' returned:\n' + prettyjson.render(repos, {keysColor: 'yellow'}))
       get_infohash(repos.repositories[reponame].master)
     })
   })
