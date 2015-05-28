@@ -15,12 +15,11 @@
     "url": "https://github.com/cjb/gittorrent/issues"
   },
   "dependencies": {
-    "bencode": "^0.7.0",
+    "bittorrent-dht": "git://github.com/substack/bittorrent-dht#dht-store",
     "bittorrent-protocol": "^1.5.7",
     "bittorrent-swarm": "^2.0.0",
     "chalk": "^1.0.0",
-    "concat-map": "^0.0.1",
-    "create-torrent": "^3.11.1",
+    "elliptic": "^3.0.3",
     "glob": "^5.0.6",
     "inherits": "^2.0.1",
     "magnet-uri": "^4.0.0",
