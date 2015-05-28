@@ -23,7 +23,7 @@ var bootstrap = ['dht.gittorrent.org:6881', 'core.gittorrent.org:6881']
 var dht = new DHT({
   bootstrap: bootstrap
 })
-dht.listen(6882)
+dht.listen(6881)
 
 var announcedRefs = {
   master: {}
