@@ -6,12 +6,22 @@ var ed25519 = new EC('ed25519')
 var exec = require('child_process').exec
 var glob = require('glob')
 var fs = require('fs')
+var hat = require('hat')
 var net = require('net')
 var Protocol = require('bittorrent-protocol')
 var spawn = require('child_process').spawn
 var ut_gittorrent = require('ut_gittorrent')
 var ut_metadata = require('ut_metadata')
 var WebTorrent = require('webtorrent')
+var zeroFill = require('zero-fill')
+
+// BitTorrent client version string (used in peer ID).
+// Generated from package.json major and minor version. For example:
+//   '0.16.1' -> '0016'
+//   '1.2.5' -> '0102'
+//
+var VERSION = require('./package.json').version
+  .match(/([0-9]+)/g).slice(0, 2).map(zeroFill(2)).join('')
 
 function die (error) {
   console.error(error)
@@ -160,7 +170,8 @@ dht.on('ready', function () {
     socket.pipe(wire).pipe(socket)
     wire.on('handshake', function (infoHash, peerId) {
       console.log('Received handshake for ' + infoHash)
-      wire.handshake(new Buffer(infoHash), new Buffer(peerId))
+      var myPeerId = new Buffer('-WW' + VERSION + '-' + hat(48), 'utf8')
+      wire.handshake(new Buffer(infoHash), new Buffer(myPeerId))
     })
     wire.ut_gittorrent.on('generatePack', function (sha) {
       console.error('calling git pack-objects')
