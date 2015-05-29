@@ -1,4 +1,4 @@
-# ![GitTorrent](http://gittorrent.org)
+# [GitTorrent](http://gittorrent.org)
 
 ### The Decentralization of GitHub
 
