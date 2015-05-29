@@ -28,7 +28,6 @@
     "webtorrent": "^0.32.0"
   },
   "devDependencies": {
-    "bittorrent-dht": "^3.0.0",
     "standard": "^3.1.1"
   },
   "homepage": "http://webtorrent.io",
