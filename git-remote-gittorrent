@@ -120,12 +120,9 @@ function get_infohash (ref) {
       client.download(infoHash, function (torrent) {
         console.warn('Downloading git pack with infohash: ' + chalk.green(infoHash) + '\n')
         torrent.on('done', function (done) {
-          var filename = torrent.storage.path + '/' + torrent.files[0].path
+          var stream = torrent.files[0].createReadStream()
           var unpack = spawn('git', ['index-pack', '--stdin', '-v', '--fix-thin'])
-          var stream = fs.createReadStream(filename)
-          stream.on('open', function () {
-            stream.pipe(unpack.stdin)
-          })
+          stream.pipe(unpack.stdin)
           unpack.stderr.pipe(process.stderr)
           unpack.on('exit', function (code) {
             var targetdir = process.env['GIT_DIR']
