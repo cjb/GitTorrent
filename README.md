@@ -20,11 +20,12 @@ gittorrentd
 
 # Design
 
-The design of GitTorrent has five components:
-1. A "git transport helper" that knows how to download and unpack git objects, and can be used by Git itself to perform a fetch/clone/push.
-1. A distributed hash table that advertises which git commits a node is willing to serve.
-1. A BitTorrent protocol extension that negotiates sending a packfile with needed objects to a peer
-1. A key/value store on the distributed hash table, used as a "user profile" describing a user's repositories and their latest git hashes.
+The design of GitTorrent has five components:  
+
+1. A "git transport helper" that knows how to download and unpack git objects, and can be used by Git itself to perform a fetch/clone/push.  
+1. A distributed hash table that advertises which git commits a node is willing to serve.  
+1. A BitTorrent protocol extension that negotiates sending a packfile with needed objects to a peer  
+1. A key/value store on the distributed hash table, used as a "user profile" describing a user's repositories and their latest git hashes.  
 1. A method for registering friendly usernames on Bitcoin's blockchain, so that a written username can be used to find a user instead of an ugly hex string.
 
 ## 1. Git Transport Helper
