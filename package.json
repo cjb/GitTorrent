@@ -17,7 +17,7 @@
   "dependencies": {
     "bittorrent-dht": "git://github.com/substack/bittorrent-dht#dht-store",
     "bittorrent-protocol": "^1.5.7",
-    "bittorrent-swarm": "^2.1.0",
+    "bittorrent-swarm": "^5.0.2",
     "chalk": "^1.0.0",
     "elliptic": "^3.0.3",
     "glob": "^5.0.6",
