@@ -44,19 +44,6 @@ var userProfile = {
   repositories: {}
 }
 
-// These would be better as execSync, but node didn't get that until 0.12.
-exec('git config user.name', function (error, stdout, stderr) {
-  userProfile.name = stdout.trim()
-  if (error !== null) {
-    die("Couldn't get git user name: " + error)
-  }
-})
-exec('git config user.email', function (error, stdout, stderr) {
-  userProfile.email = stdout.trim()
-  if (error !== null) {
-    die("Couldn't get git user email: " + error)
-  }
-})
 var key = create_or_read_keyfile()
 
 function create_or_read_keyfile () {
