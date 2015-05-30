@@ -39,8 +39,6 @@ var announcedRefs = {
   master: {}
 }
 var userProfile = {
-  name: '',
-  email: '',
   repositories: {}
 }
 
