@@ -33,7 +33,7 @@ The design of GitTorrent has five components:
 When Git is asked to perform a network operation with a URL that starts with e.g. `someprotocol://`, it calls `git-remote-someprotocol` and passes the URL as an argument.  The remote helper binary is responsible for telling Git what capabilities it has, receiving commands from Git, and downloading objects into the `.git/` directory.
 
 In GitTorrent's case, we could be asked for three styles of URL:
-* `gittorrent://some.git.hosting.site/somerepo` -- we connect over `git://` to find out what the latest commit is, then perform the download using that commit's sha1.  This is kind of like a [CDN](CDN) for a git server; the actual download of objects happens via peers, but the lookup of which objects to downloads happens in the normal Git way.
+* `gittorrent://some.git.hosting.site/somerepo` -- we connect over `git://` to find out what the latest commit is, then perform the download using that commit's sha1.  This is kind of like a [CDN](CDN) for a git server; the actual download of objects happens via peers, but the lookup of which objects to download happens in the normal Git way.
 * `gittorrent://<hex sha1>/reponame` -- the sha1 corresponds to a gittorrent user's "mutable key" (hash of their public key) on our DHT -- we look up the key, receive JSON describing the user's repositories, and then perform the download using that commit's sha1.  This doesn't use any resources outside of GitTorrent's network.
 * `gittorrent://<username>` -- the username is converted into a mutable key sha1 as above.  The mapping from usernames to sha1s happens on Bitcoin's blockchain in an OP_RETURN transaction.
 
