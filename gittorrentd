@@ -5,6 +5,7 @@ var EC = require('elliptic').ec
 var ed25519 = new EC('ed25519')
 var exec = require('child_process').exec
 var glob = require('glob')
+var path = require('path')
 var fs = require('fs')
 var hat = require('hat')
 var net = require('net')
@@ -76,12 +77,20 @@ function bpad (n, buf) {
 
 dht.on('ready', function () {
   // Spider all */.git dirs and announce all refs.
-  var repos = glob.sync('*/{,.git/}git-daemon-export-ok', {strict: false})
+  var repos = glob.sync('{,.git/,*/.git/}git-daemon-export-ok', {strict: false})
   var count = repos.length
   repos.forEach(function (repo) {
-    console.log('in repo ' + repo)
     repo = repo.replace(/git-daemon-export-ok$/, '')
-    console.log(repo)
+    if (repo === '') {
+      repo = process.cwd()  // We're in '.git'.
+    }
+    var reponame = path.basename(repo.replace(/\/?.git\/?$/, ''))
+    if (reponame === '' || reponame === '.') {
+      // repo = './.git'
+      reponame = path.basename(process.cwd())
+    }
+    console.log('in repo ' + repo)
+
     var upload = spawn('git-upload-pack', ['--strict', repo])
     upload.stdout.on('data', function (line) {
       var lines = line.toString().split('\n')
@@ -96,7 +105,6 @@ dht.on('ready', function () {
             if (!announcedRefs.master[sha]) {
               console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
               announcedRefs.master[sha] = repo
-              var reponame = repo.replace(/\/.git\/$/, '')
               userProfile.repositories[reponame] = {}
               userProfile.repositories[reponame].master = sha
               // Callback counting for repos
