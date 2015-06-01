@@ -130,9 +130,22 @@ function get_infohash (ref) {
             stream.once('open', function (fd) {
               stream.write(ref + '\n')
               stream.end()
-              // These writes are actually necessary for git to finish checkout.
-              process.stdout.write('\n\n')
-              process.exit()
+            })
+            stream.once('finish', function () {
+              exec('git show-ref refs/heads/master', function (error, stdout, stderr) {
+                var sha1 = stdout.split(' ')[0]
+                if (sha1 !== ref) {
+                  // The sha1 we ended up at after applying objects is not the
+                  // one we asked for!
+                  console.error('We asked for sha1 ' + chalk.green(ref) + ' but received sha1 ' + chalk.red(sha1) + '!  Aborting.')
+                  process.exit()
+                }
+                else {
+                  // These writes are necessary for git to finish checkout.
+                  process.stdout.write('\n\n')
+                  process.exit()
+                }
+              })
             })
           })
         })
