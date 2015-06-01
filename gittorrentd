@@ -76,7 +76,7 @@ function bpad (n, buf) {
 
 dht.on('ready', function () {
   // Spider all */.git dirs and announce all refs.
-  var repos = glob.sync('*/.git/git-daemon-export-ok')
+  var repos = glob.sync('*/{,.git/}git-daemon-export-ok', {strict: false})
   var count = repos.length
   repos.forEach(function (repo) {
     console.log('in repo ' + repo)
