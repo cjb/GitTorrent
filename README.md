@@ -6,7 +6,7 @@
 
 To get started:
 ```
-npm install gittorrent
+npm install --global gittorrent
 ```
 After that, you can clone a repo with:
 ```
