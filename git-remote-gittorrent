@@ -34,6 +34,7 @@ var dht = new DHT({
   bootstrap: bootstrap
 })
 
+var remotename = process.argv[2]
 var url = process.argv[3]
 var matches = url.match(/gittorrent:\/\/([a-f0-9]{40})\/(.*)/)
 if (matches) {
@@ -53,58 +54,100 @@ if (matches) {
   })
 } else {
   url = url.replace(/^gittorrent:/i, 'git:')
-  exec('git ls-remote ' + url + ' HEAD', function (err, stdout, stderr) {
+  exec('git ls-remote ' + url, function (err, stdout, stderr) {
     if (err !== null) {
       die(err)
     }
     var lines = stdout.split('\n')
-    if (lines.length !== 2) {
+    if (lines.length < 2) {
       die("Didn't get back a single HEAD ref: " + lines)
     }
-    var line = lines[0].split('\t')
-    var ref = line[0]
-    var head = line[1]
-    if (head !== 'HEAD') {
-      die("Couldn't parse the ref line: " + ref, head)
-    }
-    if (ref.length !== 40) {
-      die('Was expecting a 40-byte sha: ' + ref)
-    }
-    dht.on('ready', function () {
-      get_infohash(ref)
+    var count = lines.length;
+    var refs = []
+    lines.forEach(function (line) {
+      if (line == '') {
+        // Last line: publish
+        dht.on('ready', function () {
+          var refcount = refs.length
+          refs.forEach(function (ref) {
+            get_infohash(ref.sha, ref.branch)
+            refcount--
+            if (refcount == 0) {
+              process.stdin.setEncoding('utf8')
+              process.stdin.on('readable', function () {
+                var chunk = process.stdin.read()
+                if (chunk === 'capabilities\n') {
+                  process.stdout.write('fetch\n\n')
+                } else if (chunk === 'list\n') {
+                  var refcount = refs.length
+                    console.warn('list:\n')
+                  refs.forEach(function (ref) {
+                    process.stdout.write(ref.sha + ' ' + ref.branch + '\n')
+                    console.warn(chalk.red(ref.sha) + ' '
+                                 + chalk.green(ref.branch))
+                    refcount--
+                    if (refcount == 0) {
+                      process.stdout.write('\n')
+                    }
+                  })
+                } else if (chunk && chunk != '') {
+                  console.warn('unhandled command: ' + chunk)
+                }
+              })
+              process.stdout.on('error', function () {
+                // stdout was closed
+              })
+            }
+          })
+        })
+        return
+      }
+
+      var line = line.split('\t')
+      var sha = line[0]
+      var branch = line[1]
+      if (sha.length !== 40) {
+        console.warn('Was expecting a 40-byte sha: ' + ref + '\n')
+        console.warn('on line: ' + line.join('\t'))
+      }
+      refs.push({sha : sha, branch : branch})
     })
   })
+
 }
 
-function get_infohash (ref) {
-  // We use console.warn (stderr) because git ignores our writes to stdout.
-  console.warn('\nOkay, we want to get: ' + chalk.green(ref) + '\n')
+var swarms = {}  // A dictionary mapping sha's to swarms.
+var need = {}    // Sha's we need.
+var got = {}     // Sha's we got.
+var todo = 0     // The number of sha's in need, not in got.
+dht.on('peer', function (addr, hash, from) {
+  if (!need[hash] && !got[hash]) {
+    todo++
+    need[hash] = true
+    got[hash] = false
+  }
+  swarms[hash].addPeer(addr)
+})
 
-  process.stdin.setEncoding('utf8')
-  process.stdin.on('readable', function () {
-    var chunk = process.stdin.read()
-    if (chunk === 'capabilities\n') {
-      process.stdout.write('fetch\n\n')
-    }
-    if (chunk === 'list\n') {
-      process.stdout.write(ref + ' refs/heads/master\n\n')
-    }
-  })
-  process.stdout.on('error', function () {
-    // stdout was closed
-  })
+function get_infohash (ref, branch) {
+  if (!branch || branch == 'HEAD' || branch == 'refs/heads/master') {
+    branch = 'master'
+  } else {
+    branch = branch.replace(/^refs\//, '')
+    branch = branch.replace(/\/head$/, '')
+  }
+
+  // We use console.warn (stderr) because git ignores our writes to stdout.
+  console.warn('\nOkay, we want to get ' + chalk.yellow(branch) + ': ' +
+               chalk.green(sha) + '\n')
 
   var magnetUri = 'magnet:?xt=urn:btih:' + ref
   var parsed = magnet(magnetUri)
   dht.lookup(parsed.infoHash)
 
-  dht.on('peer', function (addr, hash, from) {
-    swarm.addPeer(addr)
-  })
-
   var peerId = new Buffer('-WW' + VERSION + '-' + hat(48), 'utf8')
-  var swarm = new Swarm(parsed.infoHash, peerId)
-  swarm.on('wire', function (wire, addr) {
+  swarms[parsed.infoHash] = new Swarm(parsed.infoHash, peerId)
+  swarms[parsed.infoHash].on('wire', function (wire, addr) {
     console.warn('Adding swarm peer: ' + chalk.green(addr) + '\n')
     wire.use(ut_gittorrent())
     wire.ut_gittorrent.on('handshake', function () {
@@ -120,19 +163,39 @@ function get_infohash (ref) {
       client.download(infoHash, function (torrent) {
         console.warn('Downloading git pack with infohash: ' + chalk.green(infoHash) + '\n')
         torrent.on('done', function (done) {
+          todo--
+          need[ref] = false
+          got[ref] = true
+
           var stream = torrent.files[0].createReadStream()
           var unpack = spawn('git', ['index-pack', '--stdin', '-v', '--fix-thin'])
           stream.pipe(unpack.stdin)
           unpack.stderr.pipe(process.stderr)
           unpack.on('exit', function (code) {
-            var targetdir = process.env['GIT_DIR']
-            var stream = fs.createWriteStream(targetdir + '/refs/heads/master')
+            var targetdir = process.env['GIT_DIR'] || './'
+
+            // Make the parent directories; build the path.
+            var target = ['remotes', remotename].concat(branch.split('/'))
+            var path = targetdir + '/refs/'
+            for (var i = 0; i < target.length - 1; i++) {
+              path += target[i] + '/'
+              if (!fs.existsSync(path)) {
+                fs.mkdirSync(path)
+              }
+            }
+            path += target[target.length - 1]  // Add the base name.
+
+            console.warn('writing to: ' + path)
+            var stream = fs.createWriteStream(path)
             stream.once('open', function (fd) {
               stream.write(ref + '\n')
               stream.end()
-              // These writes are actually necessary for git to finish checkout.
-              process.stdout.write('\n\n')
-              process.exit()
+              if (todo == 0) {
+                // These writes are actually necessary for git to finish
+                // checkout.
+                process.stdout.write('\n\n')
+                process.exit()
+              }
             })
           })
         })
