@@ -6,8 +6,10 @@
 
 To get started:
 ```
-npm install --global gittorrent
+sudo npm install --global gittorrent
 ```
+(You can avoid `sudo` if you place the gittorrent binaries in your `$PATH`.)
+
 After that, you can clone a repo with:
 ```
 git clone gittorrent://github.com/someuser/somerepo
