@@ -11,6 +11,7 @@ var Swarm = require('bittorrent-swarm')
 var ut_gittorrent = require('ut_gittorrent')
 var WebTorrent = require('webtorrent')
 var zeroFill = require('zero-fill')
+var config = require('./config')
 
 // BitTorrent client version string (used in peer ID).
 // Generated from package.json major and minor version. For example:
@@ -28,9 +29,8 @@ function die (error) {
 // Gotta enable color manually because stdout isn't a tty.
 var chalk = new Chalk.constructor({enabled: true});
 
-var bootstrap = ['dht.gittorrent.org:6881', 'core.gittorrent.org:6881']
 var dht = new DHT({
-  bootstrap: bootstrap
+  bootstrap: config.dht.bootstrap
 })
 
 // After building a dictionary of references (sha's to branch names), responds
@@ -180,7 +180,7 @@ function get_infohash (sha, branch) {
     wire.ut_gittorrent.on('receivedTorrent', function (infoHash) {
       var client = new WebTorrent({
         dht: {
-          bootstrap: bootstrap
+          bootstrap: config.dht.bootstrap
         },
         tracker: false
       })

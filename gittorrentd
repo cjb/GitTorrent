@@ -14,6 +14,7 @@ var ut_gittorrent = require('ut_gittorrent')
 var ut_metadata = require('ut_metadata')
 var WebTorrent = require('webtorrent')
 var zeroFill = require('zero-fill')
+var config = require('./config')
 
 // BitTorrent client version string (used in peer ID).
 // Generated from package.json major and minor version. For example:
@@ -28,12 +29,10 @@ function die (error) {
   process.exit(1)
 }
 
-var bootstrap = ['dht.gittorrent.org:6881', 'core.gittorrent.org:6881']
-
 var dht = new DHT({
-  bootstrap: bootstrap
+  bootstrap: config.dht.bootstrap
 })
-dht.listen(6881)
+dht.listen(config.dht.listen)
 
 var announcedRefs = {
 }
@@ -44,17 +43,16 @@ var userProfile = {
 var key = create_or_read_keyfile()
 
 function create_or_read_keyfile () {
-  var filename = 'ed25519.key'
-  if (!fs.existsSync(filename)) {
+  if (!fs.existsSync(config.key)) {
     var keypair = new EC('ed25519').genKeyPair()
-    fs.writeFileSync(filename, JSON.stringify({
+    fs.writeFileSync(config.key, JSON.stringify({
       pub: keypair.getPublic('hex'),
       priv: keypair.getPrivate('hex')
     }))
   }
 
   // Okay, now the file exists, whether created here or not.
-  var key = JSON.parse(fs.readFileSync('ed25519.key').toString())
+  var key = JSON.parse(fs.readFileSync(config.key).toString())
   return ed25519.keyPair({
     priv: key.priv,
     privEnc: 'hex',
@@ -110,7 +108,7 @@ dht.on('ready', function () {
             branch = branch[1]
             console.log('Announcing ' + sha + ' for ' + branch + ' on repo ' + repo)
             announcedRefs[sha] = repo
-            dht.announce(sha, 30000, function (err) {
+            dht.announce(sha, config.dht.announce, function (err) {
               if (err !== null) {
                 console.log('Announced ' + sha)
               }
@@ -188,7 +186,7 @@ dht.on('ready', function () {
         } else {
           console.error('Finished writing ' + filename)
           var webtorrent = new WebTorrent({
-            dht: {bootstrap: bootstrap},
+            dht: {bootstrap: config.dht.bootstrap},
             tracker: false
           })
           webtorrent.seed(filename, function onTorrent (torrent) {
@@ -207,5 +205,5 @@ dht.on('ready', function () {
       pack.stdin.write(sha + '\n')
       pack.stdin.write('--not\n\n')
     })
-  }).listen(30000)
+  }).listen(config.dht.announce)
 })
