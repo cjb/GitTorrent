@@ -129,53 +129,50 @@ if (matches) {
 
 }
 
-var swarms = {}  // A dictionary mapping sha's to swarms.
-var got = {}     // Sha's we got.
+var fetching = {}  // Maps shas -> {got: <bool>, swarm, branches: [...]}
 var todo = 0     // The number of sha's we have yet to fetch. We will not exit
                  // until this equals zero.
 dht.on('peer', function (addr, hash, from) {
-  if (!(hash in got)) {
-    todo++  // We only want to wait on a file if a peer has it.
-    got[hash] = false
+  var goal = fetching[hash]
+  if (!goal.peer) {
+    todo++
+    goal.peer = true
   }
-  swarms[hash].addPeer(addr)
+  goal.swarm.addPeer(addr)
 })
 
-function update_ref (sha, branch) {
-  var targetdir = process.env['GIT_DIR'] || '.'
-  branch = remotename + '/' + branch
-  spawn('git', ['update-ref', branch, sha])
-  console.warn('git update-ref ' + chalk.yellow(branch) + ' ' +
-               chalk.green(sha))
-  todo--
-  if (todo <= 0) {
-    // These writes are actually necessary for git to finish
-    // checkout.
-    process.stdout.write('\n\n')
-    process.exit()
-  }
+function update_ref (sha) {
+  fetching[sha].branches.forEach(function (branch) {
+    branch = remotename + '/' + branch
+    spawn('git', ['update-ref', branch, sha])
+    console.warn('git update-ref ' + chalk.yellow(branch) + ' ' +
+                 chalk.green(sha))
+  })
 }
 
 function get_infohash (sha, branch) {
   branch = branch.replace(/^refs\/(heads\/)?/, '')
   branch = branch.replace(/\/head$/, '')
 
-  // Prevent starting a redundant lookups
-  if (sha in got) {
-    return
-  }
-
   // We use console.warn (stderr) because git ignores our writes to stdout.
   console.warn('\nOkay, we want to get ' + chalk.yellow(branch) + ': ' +
                chalk.green(sha) + '\n')
+
+  if (sha in fetching) {
+    fetching[sha].branches.push(branch)
+    return  // Prevent starting a redundant lookups
+  }
+
+  var info = {got: false, peer: false, swarm: null, branches: [branch]}
+  fetching[sha] = info
 
   var magnetUri = 'magnet:?xt=urn:btih:' + sha
   var parsed = magnet(magnetUri)
   dht.lookup(parsed.infoHash)
 
   var peerId = new Buffer('-WW' + VERSION + '-' + hat(48), 'utf8')
-  swarms[parsed.infoHash] = new Swarm(parsed.infoHash, peerId)
-  swarms[parsed.infoHash].on('wire', function (wire, addr) {
+  info.swarm = new Swarm(parsed.infoHash, peerId)
+  info.swarm.on('wire', function (wire, addr) {
     console.warn('Adding swarm peer: ' + chalk.green(addr) + ' for ' +
                  chalk.red(parsed.infoHash) + '\n')
     wire.use(ut_gittorrent())
@@ -192,14 +189,21 @@ function get_infohash (sha, branch) {
       client.download(infoHash, function (torrent) {
         console.warn('Downloading git pack with infohash: ' + chalk.green(infoHash) + '\n')
         torrent.on('done', function (done) {
-          got[sha] = true
+          fetching[sha].got = true
 
           var stream = torrent.files[0].createReadStream()
           var unpack = spawn('git', ['index-pack', '--stdin', '-v', '--fix-thin'])
           stream.pipe(unpack.stdin)
           unpack.stderr.pipe(process.stderr)
           unpack.on('exit', function (code) {
-            update_ref(sha, branch)
+            update_ref(sha)
+            todo--
+            if (todo <= 0) {
+              // These writes are actually necessary for git to finish
+              // checkout.
+              process.stdout.write('\n\n')
+              process.exit()
+            }
           })
         })
       })
