@@ -36,7 +36,6 @@ var dht = new DHT({
 dht.listen(6881)
 
 var announcedRefs = {
-  master: {}
 }
 var userProfile = {
   repositories: {}
@@ -82,37 +81,52 @@ dht.on('ready', function () {
     console.log('in repo ' + repo)
     repo = repo.replace(/git-daemon-export-ok$/, '')
     console.log(repo)
+
+    var reponame = repo.replace(/\/.git\/$/, '')
+    userProfile.repositories[reponame] = {}
+
     var upload = spawn('git-upload-pack', ['--strict', repo])
     upload.stdout.on('data', function (line) {
       var lines = line.toString().split('\n')
       lines.forEach(function (line) {
         var arr = line.toString().split(' ')
-        if (arr.length === 2) {
-          var sha = arr[0].toString()
-          // First four chars are git-upload-pack's length-of-line metadata.
-          sha = sha.substring(4)
+        if (arr.length < 2) {
+          return
+        }
+        var sha = arr[0].toString()
+        // First four chars are git-upload-pack's length-of-line metadata.
+        sha = sha.substring(4)
+        if (arr.length == 2) {
           var ref = arr[1].toString()
-          if (ref.search(/^refs\/heads\//) !== -1 || ref.search(/^refs\/remotes\//) !== -1) {
-            if (!announcedRefs.master[sha]) {
-              console.log('Announcing ' + sha + ' for ref ' + ref + ' on repo ' + repo)
-              announcedRefs.master[sha] = repo
-              var reponame = repo.replace(/\/.git\/$/, '')
-              userProfile.repositories[reponame] = {}
-              userProfile.repositories[reponame].master = sha
-              // Callback counting for repos
-              count--
-              if (count <= 0) {
-                publish_mutable_key()
-              }
-              dht.announce(sha, 30000, function (err) {
-                if (err !== null) {
-                  console.log('Announced ' + sha)
-                }
-              })
-            }
+          var branch = ref.match(/^refs\/heads\/(.*)/)
+          // FIXME: Can't pull in too many branches.
+          // if (!branch) {
+          //   branch = ref.match(/^refs\/remotes\/(.*)/)
+          // }
+          if (branch) {
+            userProfile.repositories[reponame][ref] = sha
           }
+          if (branch && !announcedRefs[sha]) {
+            branch = branch[1]
+            console.log('Announcing ' + sha + ' for ' + branch + ' on repo ' + repo)
+            announcedRefs[sha] = repo
+            dht.announce(sha, 30000, function (err) {
+              if (err !== null) {
+                console.log('Announced ' + sha)
+              }
+            })
+          }
+        } else if (arr.length > 2 && arr[1].search(/^HEAD/) !== -1) {
+          // Probably the first line; line[0] has the hash, line[1] has HEAD,
+          // and beyond are the supported features.
+          userProfile.repositories[reponame]['HEAD'] = sha
         }
       })
+      // Callback counting for repos
+      count--
+      if (count <= 0) {
+        publish_mutable_key()
+      }
     })
     upload.stdout.on('end', function () {
       console.log('end')
@@ -154,7 +168,7 @@ dht.on('ready', function () {
     wire.use(ut_metadata())
     socket.pipe(wire).pipe(socket)
     wire.on('handshake', function (infoHash, peerId) {
-      console.log('Received handshake for ' + infoHash)
+      console.log('Received handshake for ' + infoHash.toString('hex'))
       var myPeerId = new Buffer('-WW' + VERSION + '-' + hat(48), 'utf8')
       wire.handshake(new Buffer(infoHash), new Buffer(myPeerId))
     })
@@ -162,10 +176,11 @@ dht.on('ready', function () {
       console.error('calling git pack-objects')
       var filename = sha + '.pack'
       var stream = fs.createWriteStream(filename)
-      if (!announcedRefs.master[sha]) {
-        console.error('Asked for an unknown sha!')
+      if (!announcedRefs[sha]) {
+        console.error('Asked for an unknown sha: ' + sha)
+        return
       }
-      var directory = announcedRefs.master[sha]
+      var directory = announcedRefs[sha]
       var pack = spawn('git', ['pack-objects', '--revs', '--thin', '--stdout', '--delta-base-offset'], {cwd: directory})
       pack.on('close', function (code) {
         if (code !== 0) {
