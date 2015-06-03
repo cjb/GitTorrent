@@ -93,7 +93,7 @@ if (matches) {
       var json = res.v.toString()
       var repos = JSON.parse(json)
       console.warn('\nMutable key ' + chalk.green(key) + ' returned:\n' +
-                   prettyjson.render(repos, {keysColor: 'yellow', valuesColor: 'green'}))
+                   prettyjson.render(repos, {keysColor: 'yellow', valuesColor: 'green'}) + '\n')
       talk_to_git(repos.repositories[reponame])
     })
   })
@@ -126,7 +126,6 @@ if (matches) {
       refs[branch] = sha
     })
   })
-
 }
 
 var fetching = {}  // Maps shas -> {got: <bool>, swarm, branches: [...]}
@@ -145,8 +144,6 @@ function update_ref (sha) {
   fetching[sha].branches.forEach(function (branch) {
     branch = remotename + '/' + branch
     spawn('git', ['update-ref', branch, sha])
-    console.warn('git update-ref ' + chalk.yellow(branch) + ' ' +
-                 chalk.green(sha))
   })
 }
 
@@ -155,12 +152,13 @@ function get_infohash (sha, branch) {
   branch = branch.replace(/\/head$/, '')
 
   // We use console.warn (stderr) because git ignores our writes to stdout.
-  console.warn('\nOkay, we want to get ' + chalk.yellow(branch) + ': ' +
-               chalk.green(sha) + '\n')
+  console.warn('Okay, we want to get ' + chalk.yellow(branch) + ': ' +
+               chalk.green(sha))
 
   if (sha in fetching) {
     fetching[sha].branches.push(branch)
-    return  // Prevent starting a redundant lookups
+    // Prevent starting a redundant lookup
+    return
   }
 
   var info = {got: false, peer: false, swarm: null, branches: [branch]}
@@ -173,8 +171,8 @@ function get_infohash (sha, branch) {
   var peerId = new Buffer('-WW' + VERSION + '-' + hat(48), 'utf8')
   info.swarm = new Swarm(parsed.infoHash, peerId)
   info.swarm.on('wire', function (wire, addr) {
-    console.warn('Adding swarm peer: ' + chalk.green(addr) + ' for ' +
-                 chalk.red(parsed.infoHash) + '\n')
+    console.warn('\nAdding swarm peer: ' + chalk.green(addr) + ' for ' +
+                 chalk.green(parsed.infoHash))
     wire.use(ut_gittorrent())
     wire.ut_gittorrent.on('handshake', function () {
       wire.ut_gittorrent.ask(parsed.infoHash)
