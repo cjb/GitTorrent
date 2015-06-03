@@ -3,7 +3,6 @@
 var Chalk = require('chalk')
 var DHT = require('bittorrent-dht')
 var exec = require('child_process').exec
-var fs = require('fs')
 var hat = require('hat')
 var magnet = require('magnet-uri')
 var prettyjson = require('prettyjson')
@@ -142,34 +141,19 @@ dht.on('peer', function (addr, hash, from) {
   swarms[hash].addPeer(addr)
 })
 
-function write_sha (sha, branch) {
-  // TODO: use `git update-ref`
+function update_ref (sha, branch) {
   var targetdir = process.env['GIT_DIR'] || '.'
-
-  // Make the parent directories; build the path.
-  var path = targetdir + '/refs'
-  var target = ['remotes', remotename].concat(branch.split('/'))
-  target.forEach(function (segment, i) {
-    path += '/' + segment
-    // Call mkdir on every entry segment the last
-    if (i < target.length - 1 && !fs.existsSync(path)) {
-      fs.mkdirSync(path)
-    }
-  })
-
-  console.warn('writing to: ' + path)
-  var stream = fs.createWriteStream(path)
-  stream.once('open', function (fd) {
-    stream.write(sha + '\n')
-    stream.end()
-    todo--
-    if (todo <= 0) {
-      // These writes are actually necessary for git to finish
-      // checkout.
-      process.stdout.write('\n\n')
-      process.exit()
-    }
-  })
+  branch = remotename + '/' + branch
+  spawn('git', ['update-ref', branch, sha])
+  console.warn('git update-ref ' + chalk.yellow(branch) + ' ' +
+               chalk.green(sha))
+  todo--
+  if (todo <= 0) {
+    // These writes are actually necessary for git to finish
+    // checkout.
+    process.stdout.write('\n\n')
+    process.exit()
+  }
 }
 
 function get_infohash (sha, branch) {
@@ -215,7 +199,7 @@ function get_infohash (sha, branch) {
           stream.pipe(unpack.stdin)
           unpack.stderr.pipe(process.stderr)
           unpack.on('exit', function (code) {
-            write_sha(sha, branch)
+            update_ref(sha, branch)
           })
         })
       })
