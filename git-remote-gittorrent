@@ -12,6 +12,7 @@ var ut_gittorrent = require('ut_gittorrent')
 var WebTorrent = require('webtorrent')
 var zeroFill = require('zero-fill')
 var config = require('./config')
+var git = require('./git')
 
 // BitTorrent client version string (used in peer ID).
 // Generated from package.json major and minor version. For example:
@@ -99,31 +100,15 @@ if (matches) {
   })
 } else {
   url = url.replace(/^gittorrent:/i, 'git:')
-  exec('git ls-remote ' + url, function (err, stdout, stderr) {
-    if (err !== null) {
+  var ls = git.ls(url, function (sha, branch) {
+    refs[branch] = sha
+  })
+  ls.on('exit', function (err) {
+    if (err) {
       die(err)
     }
-    var lines = stdout.split('\n')
-    if (lines.length < 2) {
-      die("Didn't get back a single HEAD ref: " + lines)
-    }
-    lines.forEach(function (line) {
-      if (line === '') {
-        // Last line: publish
-        dht.on('ready', function () {
-          talk_to_git(refs)
-        })
-        return
-      }
-
-      line = line.split('\t')
-      var sha = line[0]
-      var branch = line[1]
-      if (sha.length !== 40) {
-        console.warn('Was expecting a 40-byte sha: ' + sha + '\n')
-        console.warn('on line: ' + line.join('\t'))
-      }
-      refs[branch] = sha
+    dht.on('ready', function () {
+      talk_to_git(refs)
     })
   })
 }
