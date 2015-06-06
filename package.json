@@ -28,7 +28,7 @@
     "rc": "^1.0.3",
     "ut_gittorrent": "^0.1.0",
     "ut_metadata": "^2.7.3",
-    "webtorrent": "^0.32.0",
+    "webtorrent": "^0.48.0",
     "zero-fill": "^2.2.1"
   },
   "devDependencies": {
