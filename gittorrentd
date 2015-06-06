@@ -72,6 +72,8 @@ function bpad (n, buf) {
   }
 }
 
+var head = ''
+
 dht.on('ready', function () {
   // Spider all */.git dirs and announce all refs.
   var repos = glob.sync('*/{,.git/}git-daemon-export-ok', {strict: false})
@@ -88,6 +90,9 @@ dht.on('ready', function () {
       // FIXME: Can't pull in too many branches, so only do heads for now.
       if (ref !== 'HEAD' && !ref.match(/^refs\/heads\//)) {
         return
+      }
+      if (ref === 'refs/heads/master') {
+        head = sha
       }
       userProfile.repositories[reponame][ref] = sha
       if (!announcedRefs[sha]) {
@@ -148,19 +153,23 @@ dht.on('ready', function () {
       wire.handshake(new Buffer(infoHash), new Buffer(myPeerId))
     })
     wire.ut_gittorrent.on('generatePack', function (sha) {
-      console.error('calling git pack-objects')
-      var filename = sha + '.pack'
-      var stream = fs.createWriteStream(filename)
+      console.error('calling git pack-objects for ' + sha)
       if (!announcedRefs[sha]) {
         console.error('Asked for an unknown sha: ' + sha)
         return
       }
       var directory = announcedRefs[sha]
-      var pack = spawn('git', ['pack-objects', '--revs', '--thin', '--stdout', '--delta-base-offset'], {cwd: directory})
-      pack.on('close', function (code) {
-        if (code !== 0) {
-          console.error('git pack-objects process exited with code ' + code)
-        } else {
+      var have = null
+      if (sha !== head) {
+        have = head
+      }
+      var pack = git.upload_pack(directory, sha, have)
+      pack.stderr.pipe(process.stderr)
+      pack.on('ready', function () {
+        var filename = sha + '.pack'
+        var stream = fs.createWriteStream(filename)
+        pack.stdout.pipe(stream)
+        stream.on('close', function () {
           console.error('Finished writing ' + filename)
           var webtorrent = new WebTorrent({
             dht: {bootstrap: config.dht.bootstrap},
@@ -170,17 +179,13 @@ dht.on('ready', function () {
             console.error(torrent.infoHash)
             wire.ut_gittorrent.sendTorrent(torrent.infoHash)
           })
+        })
+      })
+      pack.on('exit', function (code) {
+        if (code !== 0) {
+          console.error('git-upload-pack process exited with code ' + code)
         }
       })
-      pack.stdout.pipe(stream)
-      pack.stderr.on('data', function (data) {
-        console.error(data.toString())
-      })
-      pack.on('exit', function () {
-        console.log('exited')
-      })
-      pack.stdin.write(sha + '\n')
-      pack.stdin.write('--not\n\n')
     })
   }).listen(config.dht.announce)
 })
