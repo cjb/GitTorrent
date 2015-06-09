@@ -15,6 +15,7 @@ var ut_metadata = require('ut_metadata')
 var WebTorrent = require('webtorrent')
 var zeroFill = require('zero-fill')
 var config = require('./config')
+var git = require('./git')
 
 // BitTorrent client version string (used in peer ID).
 // Generated from package.json major and minor version. For example:
@@ -71,6 +72,8 @@ function bpad (n, buf) {
   }
 }
 
+var head = ''
+
 dht.on('ready', function () {
   // Spider all */.git dirs and announce all refs.
   var repos = glob.sync('*/{,.git/}git-daemon-export-ok', {strict: false})
@@ -83,55 +86,34 @@ dht.on('ready', function () {
     var reponame = repo.replace(/\/.git\/$/, '')
     userProfile.repositories[reponame] = {}
 
-    var upload = spawn('git-upload-pack', ['--strict', repo])
-    upload.stdout.on('data', function (line) {
-      var lines = line.toString().split('\n')
-      lines.forEach(function (line) {
-        var arr = line.toString().split(' ')
-        if (arr.length < 2) {
-          return
-        }
-        var sha = arr[0].toString()
-        // First four chars are git-upload-pack's length-of-line metadata.
-        sha = sha.substring(4)
-        if (arr.length == 2) {
-          var ref = arr[1].toString()
-          var branch = ref.match(/^refs\/heads\/(.*)/)
-          // FIXME: Can't pull in too many branches.
-          // if (!branch) {
-          //   branch = ref.match(/^refs\/remotes\/(.*)/)
-          // }
-          if (branch) {
-            userProfile.repositories[reponame][ref] = sha
+    var ls = git.ls(repo, function (sha, ref) {
+      // FIXME: Can't pull in too many branches, so only do heads for now.
+      if (ref !== 'HEAD' && !ref.match(/^refs\/heads\//)) {
+        return
+      }
+      if (ref === 'refs/heads/master') {
+        head = sha
+      }
+      userProfile.repositories[reponame][ref] = sha
+      if (!announcedRefs[sha]) {
+        console.log('Announcing ' + sha + ' for ' + ref + ' on repo ' + repo)
+        announcedRefs[sha] = repo
+        dht.announce(sha, config.dht.announce, function (err) {
+          if (err !== null) {
+            console.log('Announced ' + sha)
           }
-          if (branch && !announcedRefs[sha]) {
-            branch = branch[1]
-            console.log('Announcing ' + sha + ' for ' + branch + ' on repo ' + repo)
-            announcedRefs[sha] = repo
-            dht.announce(sha, config.dht.announce, function (err) {
-              if (err !== null) {
-                console.log('Announced ' + sha)
-              }
-            })
-          }
-        } else if (arr.length > 2 && arr[1].search(/^HEAD/) !== -1) {
-          // Probably the first line; line[0] has the hash, line[1] has HEAD,
-          // and beyond are the supported features.
-          userProfile.repositories[reponame]['HEAD'] = sha
-        }
-      })
-      // Callback counting for repos
+        })
+      }
+    })
+    ls.stdout.on('end', function () {
       count--
       if (count <= 0) {
         publish_mutable_key()
       }
     })
-    upload.stdout.on('end', function () {
-      console.log('end')
-    })
-    upload.on('exit', function (code) {
-      if (code !== 0) {
-        die('Failed: ' + code)
+    ls.on('exit', function (err) {
+      if (err) {
+        die(err)
       }
     })
   })
@@ -171,19 +153,23 @@ dht.on('ready', function () {
       wire.handshake(new Buffer(infoHash), new Buffer(myPeerId))
     })
     wire.ut_gittorrent.on('generatePack', function (sha) {
-      console.error('calling git pack-objects')
-      var filename = sha + '.pack'
-      var stream = fs.createWriteStream(filename)
+      console.error('calling git pack-objects for ' + sha)
       if (!announcedRefs[sha]) {
         console.error('Asked for an unknown sha: ' + sha)
         return
       }
       var directory = announcedRefs[sha]
-      var pack = spawn('git', ['pack-objects', '--revs', '--thin', '--stdout', '--delta-base-offset'], {cwd: directory})
-      pack.on('close', function (code) {
-        if (code !== 0) {
-          console.error('git pack-objects process exited with code ' + code)
-        } else {
+      var have = null
+      if (sha !== head) {
+        have = head
+      }
+      var pack = git.upload_pack(directory, sha, have)
+      pack.stderr.pipe(process.stderr)
+      pack.on('ready', function () {
+        var filename = sha + '.pack'
+        var stream = fs.createWriteStream(filename)
+        pack.stdout.pipe(stream)
+        stream.on('close', function () {
           console.error('Finished writing ' + filename)
           var webtorrent = new WebTorrent({
             dht: {bootstrap: config.dht.bootstrap},
@@ -193,17 +179,13 @@ dht.on('ready', function () {
             console.error(torrent.infoHash)
             wire.ut_gittorrent.sendTorrent(torrent.infoHash)
           })
+        })
+      })
+      pack.on('exit', function (code) {
+        if (code !== 0) {
+          console.error('git-upload-pack process exited with code ' + code)
         }
       })
-      pack.stdout.pipe(stream)
-      pack.stderr.on('data', function (data) {
-        console.error(data.toString())
-      })
-      pack.on('exit', function () {
-        console.log('exited')
-      })
-      pack.stdin.write(sha + '\n')
-      pack.stdin.write('--not\n\n')
     })
   }).listen(config.dht.announce)
 })
