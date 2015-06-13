@@ -20,6 +20,22 @@ touch somerepo/.git/git-daemon-export-ok
 gittorrentd
 ```
 
+If all goes well, you should see something like:
+
+```
+in repo somerepo/.git/git-daemon-export-ok
+somerepo/.git/
+Announcing a5491738f6415acb996f98800b33421ea472d2d6 for ref
+refs/heads/master on repo somerepo/.git/
+{"repositories":{"test":{"master":"a5491738f6415acb996f98800b33421ea472d2d6"}}}
+```
+
+You then can use that hash in URLs to clone that repo elsewhere:
+
+```
+git clone gittorrent://a5491738f6415acb996f98800b33421ea472d2d6/somerepo
+```
+
 # Design
 
 The design of GitTorrent has five components:  
