@@ -20,6 +20,8 @@ touch somerepo/.git/git-daemon-export-ok
 gittorrentd
 ```
 
+Note that GitTorrent is not affiliated with the [git project](http://git-scm.com/).
+
 # Design
 
 The design of GitTorrent has five components:  
