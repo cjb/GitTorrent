@@ -15,7 +15,7 @@
     "url": "https://github.com/cjb/gittorrent/issues"
   },
   "dependencies": {
-    "bittorrent-dht": "git://github.com/substack/bittorrent-dht#dht-store",
+    "bittorrent-dht": "git://github.com/cjb/bittorrent-dht#dht-store",
     "bittorrent-protocol": "^1.5.7",
     "bittorrent-swarm": "^5.0.2",
     "chalk": "^1.0.0",
