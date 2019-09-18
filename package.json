@@ -8,8 +8,8 @@
     "url": "http://printf.net/"
   },
   "bin": {
-    "git-remote-gittorrent": "./git-remote-gittorrent",
-    "gittorrentd": "./gittorrentd"
+    "git-remote-gittorrent": "./lib/git-remote-gittorrent.js",
+    "gittorrentd": "./lib/gittorrentd.js"
   },
   "bugs": {
     "url": "https://github.com/cjb/gittorrent/issues"
@@ -32,7 +32,7 @@
     "zero-fill": "^2.2.1"
   },
   "devDependencies": {
-    "standard": "^3.1.1"
+    "standard": "^14.3.0"
   },
   "homepage": "http://gittorrent.org",
   "keywords": [
