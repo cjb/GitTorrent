@@ -19,7 +19,7 @@
     "bittorrent-protocol": "^1.5.7",
     "bittorrent-swarm": "^5.0.2",
     "chalk": "^1.0.0",
-    "elliptic": "^3.0.3",
+    "elliptic": "^6.5.3",
     "glob": "^5.0.6",
     "hat": "^0.0.3",
     "inherits": "^2.0.1",
